@@ -1,0 +1,1507 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>亂世浮生錄 · 三國人生模擬器</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        ink: { 950: '#0F1012', 900: '#17181C', 800: '#25282F', 700: '#383D47', 600: '#525966' },
+                        parchment: { 50: '#FDFBF5', 100: '#F7F3E5', 200: '#EFE7CF', 300: '#DFD3B3', 800: '#463B23', 900: '#2D2312' },
+                        vermilion: { 500: '#C0392B', 600: '#A92B1C', 700: '#8A1F13' },
+                        jade: { 600: '#2E7D59', 700: '#236145' },
+                        ochre: { 500: '#C28E3F', 600: '#A37227' }
+                    },
+                    fontFamily: {
+                        classical: ['"Kaiti TC"', '"STKaiti"', '"Songti TC"', '"Noto Serif TC"', 'serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #111215;
+            background-image: 
+                radial-gradient(circle at 50% 20%, rgba(223, 211, 179, 0.05) 0%, transparent 60%),
+                radial-gradient(circle at 15% 85%, rgba(192, 57, 43, 0.04) 0%, transparent 50%);
+            color: #2D2312;
+            font-family: 'Kaiti TC', 'STKaiti', 'Songti TC', 'Noto Serif TC', serif;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .paper-bg {
+            background-color: #F8F4E6;
+            background-image: 
+                radial-gradient(rgba(0,0,0,0.025) 1px, transparent 0),
+                linear-gradient(to right, rgba(163, 114, 39, 0.04) 1px, transparent 1px);
+            background-size: 20px 20px, 32px 32px;
+            box-shadow: 0 15px 35px -10px rgba(0,0,0,0.6), inset 0 0 50px rgba(180, 150, 100, 0.16);
+            border: 1px solid #D6C8A6;
+        }
+
+        .scroll-custom::-webkit-scrollbar { width: 5px; height: 5px; }
+        .scroll-custom::-webkit-scrollbar-track { background: rgba(223, 211, 179, 0.35); border-radius: 4px; }
+        .scroll-custom::-webkit-scrollbar-thumb { background: #A37227; border-radius: 4px; }
+
+        /* 朱砂官印風格 */
+        .seal-stamp {
+            border: 2px solid #A92B1C;
+            color: #A92B1C;
+            box-shadow: 0 0 2px rgba(169, 43, 28, 0.5), inset 0 0 3px rgba(169, 43, 28, 0.25);
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 3px;
+        }
+
+        /* 墨漬顯現動態效果 */
+        @keyframes inkRise {
+            0% { opacity: 0; transform: translateY(8px); filter: blur(1.5px); }
+            100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+        }
+        .ink-appear {
+            animation: inkRise 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        /* 金戈鐵馬震動感 */
+        @keyframes battleTremor {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-3px); }
+            40%, 80% { transform: translateX(3px); }
+        }
+        .battle-shake {
+            animation: battleTremor 0.4s ease-in-out;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-start p-2 sm:p-4 text-ink-900">
+
+    <!-- 主遊戲卡牌容器 -->
+    <main class="w-full max-w-5xl paper-bg rounded-lg flex flex-col min-h-[95vh] border-2 border-ochre-600/30 relative overflow-hidden shadow-2xl">
+        
+        <!-- 大漢古璽裝飾水印 -->
+        <div class="absolute -right-10 -bottom-10 w-52 h-52 rounded-full border-8 border-vermilion-700/5 pointer-events-none flex items-center justify-center -rotate-12">
+            <span class="text-7xl font-bold text-vermilion-700/10">漢</span>
+        </div>
+
+        <!-- 頂部歷史年號與天候勢力欄 -->
+        <header class="border-b-2 border-stone-300/80 px-4 py-3 bg-[#EFE7D0] flex flex-wrap items-center justify-between gap-3 z-10">
+            <div class="flex items-center space-x-3">
+                <span class="seal-stamp text-xs px-2 py-0.5">三國</span>
+                <div class="flex flex-col">
+                    <div class="flex items-center space-x-2">
+                        <h1 class="text-lg sm:text-2xl font-bold tracking-widest text-ink-950" id="ui-hero-name">未定名</h1>
+                        <span id="ui-hero-gender" class="text-xs bg-stone-700 text-stone-100 px-1.5 py-0.5 rounded">男</span>
+                        <span id="ui-hero-birth-rank" class="text-xs bg-ochre-600 text-white px-2 py-0.5 rounded shadow-sm">郡望豪族</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 時間年號與狀態 -->
+            <div class="flex items-center flex-wrap gap-2 text-xs sm:text-sm font-semibold">
+                <span id="ui-era-year" class="bg-amber-100/90 border border-amber-300/80 px-2.5 py-1 rounded text-stone-800 shadow-sm">
+                    中平元年 (184年)
+                </span>
+                <span id="ui-hero-age" class="bg-amber-100/90 border border-amber-300/80 px-2.5 py-1 rounded text-stone-800 shadow-sm">
+                    0 歲
+                </span>
+                <span id="ui-hero-faction" class="bg-stone-200 border border-stone-300 px-2 py-1 rounded text-ink-700">
+                    在野白身
+                </span>
+                <span id="ui-action-points" class="bg-emerald-100 border border-emerald-300 px-2 py-1 rounded text-emerald-900 font-bold">
+                    令符: 2/2
+                </span>
+            </div>
+        </header>
+
+        <!-- 官職與爵位橫幅條 -->
+        <section class="bg-[#E6DEC4] px-4 py-2 border-b border-stone-300 flex flex-wrap items-center justify-between text-xs sm:text-sm gap-2">
+            <div class="flex items-center space-x-3 truncate">
+                <span class="text-stone-600 font-bold">現任官位：</span>
+                <span id="ui-hero-office" class="text-vermilion-700 font-bold text-sm bg-white/70 px-2 py-0.5 rounded border border-vermilion-500/30">
+                    草莽布衣 (無品秩)
+                </span>
+                <span class="text-stone-600 font-bold">爵祿：</span>
+                <span id="ui-hero-nobility" class="text-amber-800 font-bold bg-white/70 px-2 py-0.5 rounded border border-amber-500/30">
+                    庶民 · 歲俸 0 石
+                </span>
+            </div>
+            <div class="flex items-center space-x-2 text-xs text-stone-700">
+                <span>配偶：<b id="ui-hero-spouse" class="text-ink-900 font-normal">未婚</b></span>
+                <span>|</span>
+                <span>子嗣：<b id="ui-hero-children" class="text-ink-900 font-normal">0 人</b></span>
+            </div>
+        </section>
+
+        <!-- 核心屬性面板 (六維數值與財富資源) -->
+        <section class="grid grid-cols-2 sm:grid-cols-6 gap-2 p-3 bg-parchment-100/80 border-b border-stone-300 text-xs sm:text-sm">
+            <!-- 體魄 -->
+            <div class="p-2 rounded bg-white/80 border border-stone-200 shadow-sm">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="font-bold text-red-900 flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5 inline text-red-600" fill="currentColor" viewBox="0 0 20 20"><path d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"/></svg>
+                        體魄
+                    </span>
+                    <span id="val-hp" class="font-bold text-stone-900">80</span>
+                </div>
+                <div class="w-full bg-stone-200 h-1.5 rounded-full overflow-hidden">
+                    <div id="bar-hp" class="bg-vermilion-500 h-full transition-all duration-300" style="width: 80%"></div>
+                </div>
+            </div>
+
+            <!-- 武勇 -->
+            <div class="p-2 rounded bg-white/80 border border-stone-200 shadow-sm">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="font-bold text-amber-900 flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5 inline text-amber-600" fill="currentColor" viewBox="0 0 20 20"><path d="M11 2a1 1 0 011 1v1.172l3.707-3.707a1 1 0 111.414 1.414L13.414 5.586H17a1 1 0 110 2h-3.586l3.707 3.707a1 1 0 01-1.414 1.414L12 9V17a1 1 0 11-2 0V9l-3.707 3.707a1 1 0 01-1.414-1.414L8.586 7.586H5a1 1 0 010-2h3.586L4.879 1.879a1 1 0 111.414-1.414L10 4.172V3a1 1 0 011-1z"/></svg>
+                        武勇
+                    </span>
+                    <span id="val-might" class="font-bold text-stone-900">35</span>
+                </div>
+                <div class="w-full bg-stone-200 h-1.5 rounded-full overflow-hidden">
+                    <div id="bar-might" class="bg-amber-600 h-full transition-all duration-300" style="width: 35%"></div>
+                </div>
+            </div>
+
+            <!-- 智略 -->
+            <div class="p-2 rounded bg-white/80 border border-stone-200 shadow-sm">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="font-bold text-blue-900 flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5 inline text-blue-600" fill="currentColor" viewBox="0 0 20 20"><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29-3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"/></svg>
+                        智略
+                    </span>
+                    <span id="val-wisdom" class="font-bold text-stone-900">40</span>
+                </div>
+                <div class="w-full bg-stone-200 h-1.5 rounded-full overflow-hidden">
+                    <div id="bar-wisdom" class="bg-blue-600 h-full transition-all duration-300" style="width: 40%"></div>
+                </div>
+            </div>
+
+            <!-- 德行名望 -->
+            <div class="p-2 rounded bg-white/80 border border-stone-200 shadow-sm">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="font-bold text-emerald-900 flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5 inline text-emerald-600" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                        聲望
+                    </span>
+                    <span id="val-fame" class="font-bold text-stone-900">15</span>
+                </div>
+                <div class="w-full bg-stone-200 h-1.5 rounded-full overflow-hidden">
+                    <div id="bar-fame" class="bg-jade-600 h-full transition-all duration-300" style="width: 15%"></div>
+                </div>
+            </div>
+
+            <!-- 兵權軍功 -->
+            <div class="p-2 rounded bg-white/80 border border-stone-200 shadow-sm">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="font-bold text-purple-900 flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5 inline text-purple-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.98 2.98 0 0112.12 15.12z" clip-rule="evenodd"/></svg>
+                        軍功
+                    </span>
+                    <span id="val-merit" class="font-bold text-stone-900">0</span>
+                </div>
+                <div class="w-full bg-stone-200 h-1.5 rounded-full overflow-hidden">
+                    <div id="bar-merit" class="bg-purple-600 h-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- 家產與糧食 -->
+            <div class="p-2 rounded bg-white/80 border border-stone-200 shadow-sm">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="font-bold text-amber-800">錢穀</span>
+                    <span id="val-wealth" class="font-bold text-stone-900">150 錢</span>
+                </div>
+                <div class="text-[11px] text-stone-600 truncate" id="val-grain-inventory">
+                    儲糧：20 石
+                </div>
+            </div>
+        </section>
+
+        <!-- 命格與名品裝備標籤列 -->
+        <section class="px-4 py-2 bg-[#F3ECE0] border-b border-stone-300/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div class="flex items-center space-x-1.5 flex-wrap">
+                <span class="font-bold text-stone-600">先天命格：</span>
+                <span id="ui-destiny-badges" class="inline-flex gap-1 flex-wrap">
+                    <!-- 動態生成命格徽章 -->
+                </span>
+            </div>
+            <div class="flex items-center space-x-2 flex-wrap">
+                <span class="font-bold text-stone-600">隨身神兵寶物：</span>
+                <span id="ui-equipment-badges" class="text-stone-700 italic">
+                    布衣無刃
+                </span>
+            </div>
+        </section>
+
+        <!-- 主體區域：年譜滾動卷軸 (左/上) + 策論政務主動行動面板 (右/下) -->
+        <div class="flex-1 flex flex-col md:flex-row min-h-[380px] overflow-hidden">
+            
+            <!-- 歷史編年與生平卷軸 -->
+            <section id="story-scroll" class="flex-1 p-4 overflow-y-auto scroll-custom space-y-3.5 bg-[#FAF6EC] border-b md:border-b-0 md:border-r border-stone-300">
+                <!-- 故事日誌由 JS 即時注入 -->
+            </section>
+
+            <!-- 主動年度行動列 (每年消耗令符行動) -->
+            <aside class="w-full md:w-72 bg-[#EFE8D3] p-3 flex flex-col justify-between border-stone-300 gap-3">
+                <div>
+                    <div class="flex items-center justify-between pb-1.5 border-b border-stone-300 mb-2">
+                        <span class="font-bold text-ink-950 text-sm flex items-center gap-1">
+                            <span class="seal-stamp text-[10px] px-1">行策</span>
+                            歲月令事
+                        </span>
+                        <span class="text-[11px] text-stone-500">消耗令符</span>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-1 gap-2 text-xs" id="action-buttons-box">
+                        <button onclick="performAction('train')" class="p-2 rounded bg-white hover:bg-amber-50 border border-stone-300 hover:border-amber-600 shadow-sm text-left transition flex items-center justify-between">
+                            <span class="font-bold text-amber-900">演武習藝</span>
+                            <span class="text-[10px] text-stone-500">武勇/體魄+</span>
+                        </button>
+                        <button onclick="performAction('study')" class="p-2 rounded bg-white hover:bg-blue-50 border border-stone-300 hover:border-blue-600 shadow-sm text-left transition flex items-center justify-between">
+                            <span class="font-bold text-blue-900">讀書求索</span>
+                            <span class="text-[10px] text-stone-500">智略/德行+</span>
+                        </button>
+                        <button onclick="performAction('trade')" class="p-2 rounded bg-white hover:bg-emerald-50 border border-stone-300 hover:border-emerald-600 shadow-sm text-left transition flex items-center justify-between">
+                            <span class="font-bold text-emerald-900">經商市舶</span>
+                            <span class="text-[10px] text-stone-500">賺取銅錢糧米</span>
+                        </button>
+                        <button onclick="performAction('social')" class="p-2 rounded bg-white hover:bg-purple-50 border border-stone-300 hover:border-purple-600 shadow-sm text-left transition flex items-center justify-between">
+                            <span class="font-bold text-purple-900">拜會名流</span>
+                            <span class="text-[10px] text-stone-500">結納三國名將</span>
+                        </button>
+                        <button onclick="performAction('seekImmortal')" class="p-2 rounded bg-white hover:bg-teal-50 border border-stone-300 hover:border-teal-600 shadow-sm text-left transition flex items-center justify-between">
+                            <span class="font-bold text-teal-900">尋仙問道</span>
+                            <span class="text-[10px] text-stone-500">求訪華佗/左慈</span>
+                        </button>
+                        <button onclick="performAction('govern')" id="btn-action-govern" class="p-2 rounded bg-white hover:bg-stone-100 border border-stone-300 shadow-sm text-left transition flex items-center justify-between">
+                            <span class="font-bold text-ink-900">治民屯田</span>
+                            <span class="text-[10px] text-stone-500">升遷積累軍功</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 羈絆名人錄清單 -->
+                <div class="mt-2 pt-2 border-t border-stone-300/80 flex-1">
+                    <span class="text-[11px] font-bold text-stone-600 mb-1 block">同道知己 (人際羈絆)：</span>
+                    <div id="ui-friends-list" class="flex flex-wrap gap-1 text-[11px] max-h-24 overflow-y-auto scroll-custom">
+                        <span class="text-stone-500 italic">尚無生死知交</span>
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+        <!-- 關鍵命運抉擇與戰役陣法指揮視窗 (互動視窗) -->
+        <div id="choice-container" class="hidden border-t-2 border-ochre-600 bg-[#FCF8EC] p-4 z-20 shadow-inner">
+            <div class="flex items-center space-x-2 mb-1.5">
+                <span class="seal-stamp text-xs px-2 py-0.5" id="choice-stamp">天命抉擇</span>
+                <h3 id="choice-title" class="font-bold text-ink-950 text-base">此去何從？</h3>
+            </div>
+            <p id="choice-desc" class="text-xs sm:text-sm text-stone-700 mb-3 leading-relaxed">
+                描述文字
+            </p>
+            <div id="choice-options" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs sm:text-sm">
+                <!-- 動態注入選項按鈕 -->
+            </div>
+        </div>
+
+        <!-- 底部主控台：前進一年、自動推演、琴律音訊 -->
+        <footer class="border-t border-stone-300 p-3 bg-[#E9E1C9] flex flex-wrap items-center justify-between gap-3 z-10">
+            <div class="flex items-center space-x-2 flex-wrap">
+                <button id="btn-next-year" class="px-5 py-2.5 bg-ink-900 hover:bg-ink-800 text-parchment-100 rounded text-sm font-bold shadow-md active:translate-y-0.5 transition flex items-center space-x-1.5">
+                    <svg class="w-4 h-4 text-ochre-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                    <span>度過一年</span>
+                </button>
+                <button id="btn-auto" class="px-4 py-2.5 bg-stone-300 hover:bg-stone-400 text-ink-900 rounded text-sm font-bold shadow-sm transition">
+                    <span id="auto-text">自動推演</span>
+                </button>
+                <div class="flex items-center bg-stone-200/90 rounded px-1.5 py-1 border border-stone-300 text-xs">
+                    <span class="text-stone-500 mr-1 hidden sm:inline">速度:</span>
+                    <button class="speed-btn px-2 py-0.5 font-bold rounded bg-white shadow-xs" data-speed="1100">1x</button>
+                    <button class="speed-btn px-2 py-0.5 font-bold text-stone-600" data-speed="600">2x</button>
+                    <button class="speed-btn px-2 py-0.5 font-bold text-stone-600" data-speed="250">4x</button>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-2 text-xs">
+                <button id="btn-sound" class="px-3 py-2 border border-stone-300 rounded bg-white/80 hover:bg-white text-stone-800 shadow-sm transition">
+                    <span id="sound-indicator">古琴律：鳴</span>
+                </button>
+                <button id="btn-restart" class="px-3 py-2 border border-vermilion-700 text-vermilion-700 hover:bg-vermilion-700 hover:text-white rounded font-bold shadow-sm transition">
+                    轉世重修
+                </button>
+            </div>
+        </footer>
+
+        <!-- 開局抽取先天命格彈窗 (全螢幕覆蓋) -->
+        <div id="destiny-select-modal" class="hidden absolute inset-0 bg-ink-950/85 backdrop-blur-sm z-40 flex items-center justify-center p-3 sm:p-5">
+            <div class="paper-bg w-full max-w-xl rounded-lg p-5 sm:p-6 border-4 border-ochre-600 shadow-2xl">
+                <div class="text-center mb-4">
+                    <span class="seal-stamp text-xs px-2.5 py-1">宿命初始</span>
+                    <h2 class="text-xl sm:text-2xl font-bold tracking-widest mt-1 text-ink-950">投胎降世 · 稟賦天成</h2>
+                    <p class="text-xs sm:text-sm text-stone-600 mt-1">天命靡常，唯德是輔。請於以下天地命格中擇其一以立基業：</p>
+                </div>
+                <div id="destiny-cards-grid" class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+                    <!-- 卡片選項 -->
+                </div>
+                <div class="text-center text-xs text-stone-500">
+                    命格定其稟賦，後天造化猶在人為。
+                </div>
+            </div>
+        </div>
+
+        <!-- 抓周禮儀式彈窗 (1歲時強制觸發) -->
+        <div id="zhuazhou-modal" class="hidden absolute inset-0 bg-ink-950/80 backdrop-blur-sm z-40 flex items-center justify-center p-3">
+            <div class="paper-bg w-full max-w-lg rounded-lg p-5 border-2 border-vermilion-700 shadow-2xl text-center">
+                <span class="seal-stamp text-xs px-2 py-0.5">周晬之喜</span>
+                <h2 class="text-xl font-bold tracking-wider text-ink-950 mt-1">周歲抓周禮</h2>
+                <p class="text-xs text-stone-600 mt-1 mb-4 leading-relaxed">
+                    堂前紅氍毹上陳列諸物，親族齊聚觀汝試兒。汝蹣跚向前，伸出幼手抓取何物？
+                </p>
+                <div id="zhuazhou-items" class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+                    <!-- 抓周物件 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 終局青史立碑與三國志列傳 (結算與分享卡片) -->
+        <div id="death-modal" class="hidden absolute inset-0 bg-ink-950/90 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+            <div id="memorial-card" class="paper-bg w-full max-w-2xl rounded-lg p-6 sm:p-8 border-4 border-stone-700 shadow-2xl relative">
+                
+                <div class="text-center border-b-2 border-stone-400 pb-3 mb-4">
+                    <span class="seal-stamp text-xs px-2.5 py-0.5">漢魏晉演義 · 臣民列傳</span>
+                    <h2 id="end-hero-title" class="text-2xl sm:text-3xl font-extrabold text-ink-950 tracking-widest my-2">
+                        諡號 · 【武毅鄉侯】
+                    </h2>
+                    <p id="end-hero-couplet" class="text-xs sm:text-sm text-stone-700 italic">
+                        「橫刀勒馬定中原，秋風五丈白髮殘。」
+                    </p>
+                </div>
+
+                <!-- 史官立傳正文 -->
+                <div class="bg-white/80 p-4 rounded border border-stone-300 text-xs sm:text-sm leading-relaxed text-ink-900 mb-4 max-h-56 overflow-y-auto scroll-custom space-y-2" id="end-biography">
+                    <!-- 列傳文章由程式動態組裝 -->
+                </div>
+
+                <!-- 生平功績結算表格 -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs bg-[#ECE3CC] p-3 rounded border border-stone-300 mb-4 text-stone-800">
+                    <div>享年：<b id="end-stat-age" class="text-ink-950 font-bold">0 歲</b></div>
+                    <div>終任官職：<b id="end-stat-office" class="text-vermilion-700 font-bold">布衣</b></div>
+                    <div>最高爵位：<b id="end-stat-nobility" class="text-amber-800 font-bold">無</b></div>
+                    <div>積累軍功：<b id="end-stat-merit" class="text-purple-800 font-bold">0</b></div>
+                    <div>後嗣枝葉：<b id="end-stat-heir" class="text-ink-950 font-bold">0 人</b></div>
+                    <div>終局財資：<b id="end-stat-wealth" class="text-stone-900 font-bold">0 錢</b></div>
+                    <div>死因：<b id="end-stat-cause" class="text-red-700 font-bold">病篤</b></div>
+                    <div>史家評定：<b id="end-stat-rank" class="text-jade-700 font-bold">九品中下</b></div>
+                </div>
+
+                <div class="flex items-center justify-between gap-3 flex-wrap">
+                    <button id="btn-copy-history" class="px-4 py-2 bg-stone-200 hover:bg-stone-300 text-ink-900 rounded text-xs font-bold transition flex items-center gap-1 border border-stone-400">
+                        <span>複製青史列傳</span>
+                    </button>
+                    <button id="btn-reincarnate" class="px-6 py-2.5 bg-vermilion-700 hover:bg-vermilion-600 text-white rounded font-bold shadow-lg tracking-wider text-sm transition">
+                        投胎轉世 · 再譜亂世春秋
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- 遊戲核心模組與演算法 -->
+    <script>
+        /* ================= 1. Web Audio API 宮商角徵羽音律 ================= */
+        class AncientAudio {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+                // 五聲音階 (宮=261.63Hz, 商=293.66Hz, 角=329.63Hz, 徵=392.00Hz, 羽=440.00Hz)
+                this.notes = [261.63, 293.66, 329.63, 392.0, 440.0, 523.25, 587.33];
+            }
+            init() {
+                if (!this.ctx) {
+                    const AC = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AC();
+                }
+            }
+            // 彈撥七弦琴泛音
+            pluck(pitchIndex = 0, duration = 1.2) {
+                if (!this.enabled) return;
+                try {
+                    this.init();
+                    if (this.ctx.state === 'suspended') this.ctx.resume();
+                    const now = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+
+                    const freq = this.notes[pitchIndex % this.notes.length] || 330;
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(freq, now);
+
+                    // 琴弦起振與長尾衰減
+                    gain.gain.setValueAtTime(0.001, now);
+                    gain.gain.linearRampToValueAtTime(0.25, now + 0.03);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + duration);
+                } catch(e) {}
+            }
+            // 戰鼓沉雷音效
+            warDrum() {
+                if (!this.enabled) return;
+                try {
+                    this.init();
+                    if (this.ctx.state === 'suspended') this.ctx.resume();
+                    const now = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(110, now);
+                    osc.frequency.exponentialRampToValueAtTime(35, now + 0.6);
+
+                    gain.gain.setValueAtTime(0.4, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.6);
+                } catch(e) {}
+            }
+        }
+        const audio = new AncientAudio();
+
+        /* ================= 2. 歷史資料庫與常數設定 ================= */
+        // 六大門第階層
+        const SOCIAL_CLASSES = [
+            { id: 'refugee', name: '寒門流民', desc: '顛沛流離，草芥之身，無寸土立足', baseStats: { hp: 70, might: 25, wisdom: 10, fame: 0, wealth: 15, grain: 2 }, officeLevel: 0 },
+            { id: 'merchant', name: '市井商賈', desc: '穿金戴玉，然居四民之末，常遭盤剝', baseStats: { hp: 75, might: 15, wisdom: 30, fame: 5, wealth: 350, grain: 30 }, officeLevel: 0 },
+            { id: 'scholar', name: '耕讀寒儒', desc: '家無擔石之儲，而架有萬卷之書', baseStats: { hp: 65, might: 15, wisdom: 45, fame: 20, wealth: 60, grain: 10 }, officeLevel: 1 },
+            { id: 'gentry', name: '郡望豪族', desc: '良田千頃，僮僕數百，為鄉里雄豪', baseStats: { hp: 80, might: 35, wisdom: 35, fame: 35, wealth: 500, grain: 80 }, officeLevel: 2 },
+            { id: 'nobility', name: '世家門閥', desc: '門生故吏遍天下，四世三公鼎盛之家', baseStats: { hp: 80, might: 20, wisdom: 55, fame: 60, wealth: 850, grain: 150 }, officeLevel: 3 },
+            { id: 'royal', name: '漢室宗親', desc: '景帝閣下玄孫，雖流落隴畝仍身懷玉碟', baseStats: { hp: 75, might: 30, wisdom: 40, fame: 50, wealth: 120, grain: 25 }, officeLevel: 2 }
+        ];
+
+        // 先天命格池 (抽取三大隨機選一)
+        const DESTINY_TRAITS = [
+            { id: 'hercules', name: '天生神力', color: 'border-red-600 bg-red-50 text-red-900', desc: '力能扛鼎，萬夫莫開。武勇初始+30，體魄上限+20。' },
+            { id: 'warlord', name: '梟雄之姿', color: 'border-purple-600 bg-purple-50 text-purple-900', desc: '寧教我負天下人。智略+20，聲望+25，戰役不易喪命。' },
+            { id: 'genius', name: '七巧玲瓏心', color: 'border-blue-600 bg-blue-50 text-blue-900', desc: '博聞強識，運籌帷幄。智略+35，讀書求索效果翻倍。' },
+            { id: 'croesus', name: '富甲一方', color: 'border-amber-600 bg-amber-50 text-amber-900', desc: '財帛自聚。初始銅錢+500，每年經商獲利增加50%。' },
+            { id: 'physician', name: '醫聖傳人', color: 'border-teal-600 bg-teal-50 text-teal-900', desc: '精通青囊內經。體魄恢復速度提高，不易罹患瘟疫。' },
+            { id: 'drifter', name: '天煞孤星', color: 'border-stone-600 bg-stone-50 text-stone-900', desc: '親緣淺薄，克己克人。武勇+25，但親族容易早逝。' },
+            { id: 'righteous', name: '仁義冠世', color: 'border-emerald-600 bg-emerald-50 text-emerald-900', desc: '仁厚過人，海內景仰。聲望初始+40，名將拜會無往不利。' }
+        ];
+
+        // 雙軌官職位階 (文官 / 武官)
+        const OFFICES_CIVIL = [
+            { level: 0, title: '白身民夫', salaryGrain: 0, salaryMoney: 0, needFame: 0, needWisdom: 0 },
+            { level: 1, title: '鄉里書吏', salaryGrain: 20, salaryMoney: 20, needFame: 15, needWisdom: 25 },
+            { level: 2, title: '縣丞簿記', salaryGrain: 50, salaryMoney: 40, needFame: 30, needWisdom: 40 },
+            { level: 3, title: '一縣之尊·縣令', salaryGrain: 120, salaryMoney: 80, needFame: 50, needWisdom: 55 },
+            { level: 4, title: '郡國太守 (二千石)', salaryGrain: 300, salaryMoney: 200, needFame: 75, needWisdom: 70 },
+            { level: 5, title: '封疆大吏·刺史州牧', salaryGrain: 600, salaryMoney: 400, needFame: 110, needWisdom: 85 },
+            { level: 6, title: '尚書僕射 / 錄尚書事', salaryGrain: 1000, salaryMoney: 700, needFame: 150, needWisdom: 100 },
+            { level: 7, title: '社稷棟樑·丞相/太尉 (三公)', salaryGrain: 2000, salaryMoney: 1500, needFame: 220, needWisdom: 115 }
+        ];
+
+        const OFFICES_MILITARY = [
+            { level: 0, title: '布衣壯丁', salaryGrain: 0, salaryMoney: 0, needMerit: 0, needMight: 0 },
+            { level: 1, title: '鄉勇伍長', salaryGrain: 15, salaryMoney: 15, needMerit: 5, needMight: 25 },
+            { level: 2, title: '軍中百夫長', salaryGrain: 40, salaryMoney: 30, needMerit: 20, needMight: 40 },
+            { level: 3, title: '牙門校尉', salaryGrain: 100, salaryMoney: 60, needMerit: 45, needMight: 55 },
+            { level: 4, title: '偏將軍 / 裨將軍', salaryGrain: 250, salaryMoney: 150, needMerit: 80, needMight: 70 },
+            { level: 5, title: '雜號將軍 (破虜/討逆)', salaryGrain: 500, salaryMoney: 300, needMerit: 130, needMight: 85 },
+            { level: 6, title: '四征/四鎮將軍', salaryGrain: 900, salaryMoney: 600, needMerit: 200, needMight: 100 },
+            { level: 7, title: '統帥天下·大將軍 / 大司馬', salaryGrain: 1800, salaryMoney: 1200, needMerit: 320, needMight: 115 }
+        ];
+
+        // 爵位系統
+        const NOBILITY_RANKS = [
+            { title: '平民無爵', prestige: 0 },
+            { title: '關內侯', prestige: 15 },
+            { title: '亭侯 (食邑百戶)', prestige: 35 },
+            { title: '鄉侯 (食邑五百戶)', prestige: 70 },
+            { title: '縣侯 (食邑千戶)', prestige: 120 },
+            { title: '開國公 (分陝而治)', prestige: 200 },
+            { title: '封王即拜 (王侯將相)', prestige: 350 }
+        ];
+
+        // 三國名將人際互動清單
+        const HISTORICAL_FIGURES = [
+            { name: '曹操', faction: '魏', role: '亂世梟雄', likeTrait: 'wisdom', gift: '倚天劍', desc: '唯才是舉，文韜武略絕倫' },
+            { name: '劉備', faction: '蜀', role: '漢室宗親', likeTrait: 'fame', gift: '雙股劍', desc: '待人寬厚，百折不撓' },
+            { name: '孫權', faction: '吳', role: '江東之主', likeTrait: 'wealth', gift: '古錠刀', desc: '善於馭將，坐斷東南' },
+            { name: '諸葛亮', faction: '蜀', role: '臥龍先生', likeTrait: 'wisdom', gift: '八陣圖秘本', desc: '管仲樂毅之才，神鬼莫測' },
+            { name: '關羽', faction: '蜀', role: '美髯公', likeTrait: 'might', gift: '青龍偃月刀', desc: '萬人莫敵，忠貫日月' },
+            { name: '周瑜', faction: '吳', role: '周郎', likeTrait: 'wisdom', gift: '焦尾琴', desc: '雅量高致，赤壁定鼎' },
+            { name: '郭嘉', faction: '魏', role: '奉孝鬼謀', likeTrait: 'wisdom', gift: '十勝十敗策', desc: '算無遺策，奇謀冠世' },
+            { name: '趙雲', faction: '蜀', role: '常勝將軍', likeTrait: 'might', gift: '亮銀槍', desc: '一身是膽，忠勇雙全' },
+            { name: '司馬懿', faction: '魏', role: '冢虎', likeTrait: 'wisdom', gift: '七星寶刀', desc: '鷹視狼顧，深沉隱忍' }
+        ];
+
+        // 神兵坐騎
+        const TREASURES_REPO = [
+            { name: '青龍偃月刀', type: '武器', might: 25, fame: 15, perk: '百戰披靡' },
+            { name: '青釭劍', type: '武器', might: 18, perk: '削鐵如泥 (戰役存活率+20%)' },
+            { name: '赤兔馬', type: '坐騎', might: 15, hp: 15, perk: '日行千里 (逃生必免一死)' },
+            { name: '爪黃飛電', type: '坐騎', fame: 20, might: 10, perk: '天威雄武' },
+            { name: '《孟德新書》', type: '兵法', wisdom: 25, perk: '陣法威力+30%' },
+            { name: '《太平要術》', type: '天書', hp: 25, wisdom: 20, perk: '避疫延年' }
+        ];
+
+        // 戰役陣法設定
+        const TACTICS = [
+            { id: 'arrow', name: '鋒矢陣 (突擊中堅)', req: 'might', bonus: '猛烈撕裂敵軍中軍', risk: '自身衝鋒極易受傷' },
+            { id: 'crane', name: '鶴翼陣 (左右包抄)', req: 'wisdom', bonus: '包抄殲敵，斬獲豐碩', risk: '需極高智謀方能奏效' },
+            { id: 'bagua', name: '八卦陣 (虛實相生)', req: 'wisdom', bonus: '生門休門變幻，傷亡極低', risk: '對兵法造詣要求甚苛' },
+            { id: 'solid', name: '堅壁清野 (據營死守)', req: 'hp', bonus: '保全元氣，穩紮穩打', risk: '斬獲戰功較為平淡' }
+        ];
+
+        /* ================= 3. 遊戲全局狀態 ================= */
+        const game = {
+            alive: false,
+            year: 184,
+            age: 0,
+            actionPoints: 2,
+            name: '未定名',
+            gender: '男',
+            socialClass: null,
+            destiny: null,
+            careerTrack: 'civil', // 'civil' 文官 或 'military' 武官
+            officeLevel: 0,
+            nobilityLevel: 0,
+            faction: '在野白身',
+            spouse: null,
+            childrenCount: 0,
+            friends: [], // 結交的名將
+            treasures: [], // 擁有神兵
+            stats: { hp: 80, might: 20, wisdom: 20, fame: 0, merit: 0, wealth: 100, grain: 20 },
+            historyLogs: [],
+            isModalActive: false,
+            autoTimer: null,
+            autoSpeed: 1100,
+            activeChoice: null
+        };
+
+        // DOM 緩存
+        const el = {
+            heroName: document.getElementById('ui-hero-name'),
+            heroGender: document.getElementById('ui-hero-gender'),
+            heroBirthRank: document.getElementById('ui-hero-birth-rank'),
+            eraYear: document.getElementById('ui-era-year'),
+            heroAge: document.getElementById('ui-hero-age'),
+            heroFaction: document.getElementById('ui-hero-faction'),
+            actionPoints: document.getElementById('ui-action-points'),
+            heroOffice: document.getElementById('ui-hero-office'),
+            heroNobility: document.getElementById('ui-hero-nobility'),
+            heroSpouse: document.getElementById('ui-hero-spouse'),
+            heroChildren: document.getElementById('ui-hero-children'),
+            valHp: document.getElementById('val-hp'),
+            valMight: document.getElementById('val-might'),
+            valWisdom: document.getElementById('val-wisdom'),
+            valFame: document.getElementById('val-fame'),
+            valMerit: document.getElementById('val-merit'),
+            valWealth: document.getElementById('val-wealth'),
+            valGrain: document.getElementById('val-grain-inventory'),
+            barHp: document.getElementById('bar-hp'),
+            barMight: document.getElementById('bar-might'),
+            barWisdom: document.getElementById('bar-wisdom'),
+            barFame: document.getElementById('bar-fame'),
+            barMerit: document.getElementById('bar-merit'),
+            destinyBadges: document.getElementById('ui-destiny-badges'),
+            equipmentBadges: document.getElementById('ui-equipment-badges'),
+            storyScroll: document.getElementById('story-scroll'),
+            friendsList: document.getElementById('ui-friends-list'),
+            choiceContainer: document.getElementById('choice-container'),
+            choiceTitle: document.getElementById('choice-title'),
+            choiceDesc: document.getElementById('choice-desc'),
+            choiceOptions: document.getElementById('choice-options'),
+            choiceStamp: document.getElementById('choice-stamp'),
+            btnNextYear: document.getElementById('btn-next-year'),
+            btnAuto: document.getElementById('btn-auto'),
+            autoText: document.getElementById('auto-text'),
+            btnRestart: document.getElementById('btn-restart'),
+            btnSound: document.getElementById('btn-sound'),
+            soundIndicator: document.getElementById('sound-indicator'),
+            destinyModal: document.getElementById('destiny-select-modal'),
+            destinyCardsGrid: document.getElementById('destiny-cards-grid'),
+            zhuazhouModal: document.getElementById('zhuazhou-modal'),
+            zhuazhouItems: document.getElementById('zhuazhou-items'),
+            deathModal: document.getElementById('death-modal'),
+            endHeroTitle: document.getElementById('end-hero-title'),
+            endHeroCouplet: document.getElementById('end-hero-couplet'),
+            endBiography: document.getElementById('end-biography'),
+            endStatAge: document.getElementById('end-stat-age'),
+            endStatOffice: document.getElementById('end-stat-office'),
+            endStatNobility: document.getElementById('end-stat-nobility'),
+            endStatMerit: document.getElementById('end-stat-merit'),
+            endStatHeir: document.getElementById('end-stat-heir'),
+            endStatWealth: document.getElementById('end-stat-wealth'),
+            endStatCause: document.getElementById('end-stat-cause'),
+            endStatRank: document.getElementById('end-stat-rank'),
+            btnReincarnate: document.getElementById('btn-reincarnate'),
+            btnCopyHistory: document.getElementById('btn-copy-history')
+        };
+
+        /* ================= 4. 開局流程與抽籤 ================= */
+        const SURNAMES = ["趙", "錢", "孫", "李", "周", "吳", "鄭", "王", "馮", "陳", "衛", "蔣", "沈", "韓", "楊", "諸葛", "司馬", "夏侯", "皇甫", "荀", "郭", "龐", "陸"];
+        const GIVEN_NAMES = ["雲", "策", "泰", "明", "忠", "淵", "衡", "懿", "昭", "度", "遜", "秀", "玄", "瑾", "操", "統", "安", "景", "毅", "敬", "崇", "奉"];
+
+        function startNewLife() {
+            stopAuto();
+            game.alive = true;
+            game.year = 184;
+            game.age = 0;
+            game.actionPoints = 2;
+            game.name = SURNAMES[Math.floor(Math.random()*SURNAMES.length)] + GIVEN_NAMES[Math.floor(Math.random()*GIVEN_NAMES.length)];
+            game.gender = Math.random() > 0.3 ? '男' : '女';
+            game.socialClass = SOCIAL_CLASSES[Math.floor(Math.random() * SOCIAL_CLASSES.length)];
+            game.officeLevel = game.socialClass.officeLevel;
+            game.nobilityLevel = 0;
+            game.careerTrack = Math.random() > 0.5 ? 'military' : 'civil';
+            game.faction = '在野白身';
+            game.spouse = null;
+            game.childrenCount = 0;
+            game.friends = [];
+            game.treasures = [];
+            game.historyLogs = [];
+            game.isModalActive = false;
+
+            // 拷貝門閥基礎屬性
+            game.stats = { ...game.socialClass.baseStats };
+
+            // 關閉各視窗
+            el.deathModal.classList.add('hidden');
+            el.choiceContainer.classList.add('hidden');
+            el.zhuazhouModal.classList.add('hidden');
+            el.storyScroll.innerHTML = '';
+
+            // 抽三選一先天命格
+            renderDestinySelection();
+        }
+
+        function renderDestinySelection() {
+            game.isModalActive = true;
+            // 隨機抽 3 個命格
+            const shuffled = [...DESTINY_TRAITS].sort(() => 0.5 - Math.random()).slice(0, 3);
+            el.destinyCardsGrid.innerHTML = '';
+
+            shuffled.forEach(trait => {
+                const card = document.createElement('div');
+                card.className = `p-4 rounded-lg border-2 cursor-pointer transition hover:scale-105 active:scale-95 shadow-md flex flex-col justify-between ${trait.color}`;
+                card.innerHTML = `
+                    <div>
+                        <div class="seal-stamp text-xs px-2 py-0.5 mb-2">${trait.name}</div>
+                        <p class="text-xs leading-relaxed font-sans">${trait.desc}</p>
+                    </div>
+                    <button class="mt-3 w-full py-1 text-xs font-bold rounded bg-ink-900 text-white shadow">承此天命</button>
+                `;
+                card.onclick = () => {
+                    selectDestiny(trait);
+                };
+                el.destinyCardsGrid.appendChild(card);
+            });
+
+            el.destinyModal.classList.remove('hidden');
+        }
+
+        function selectDestiny(trait) {
+            game.destiny = trait;
+            el.destinyModal.classList.add('hidden');
+            game.isModalActive = false;
+
+            // 命格數值加成
+            if (trait.id === 'hercules') { game.stats.might += 30; game.stats.hp += 20; }
+            if (trait.id === 'warlord') { game.stats.wisdom += 20; game.stats.fame += 25; }
+            if (trait.id === 'genius') { game.stats.wisdom += 35; }
+            if (trait.id === 'croesus') { game.stats.wealth += 500; }
+            if (trait.id === 'righteous') { game.stats.fame += 40; }
+            if (trait.id === 'drifter') { game.stats.might += 25; }
+
+            // 寫入降生首篇日誌
+            appendLog(184, 0, "降生", `歲在甲子，黃巾烽火連天。汝生於【${game.socialClass.name}】之家。門第評注：${game.socialClass.desc}。天賜命格【${game.destiny.name}】！`, 'history');
+
+            updateUI();
+            audio.pluck(0);
+        }
+
+        /* ================= 5. 一歲抓周禮互動 ================= */
+        const ZHUAZHOU_ITEMS = [
+            { name: '檀木小劍', desc: '手握青鋒，自幼好武', effect: () => { game.stats.might += 15; return '自幼敏捷英銳，舞弄木劍如虎添翼！武勇+15'; } },
+            { name: '墨色竹簡', desc: '博覽古今，墨香伴身', effect: () => { game.stats.wisdom += 15; return '手不釋卷，見聖賢墨跡開顏歡笑！智略+15'; } },
+            { name: '紫檀算盤', desc: '精打細算，富甲商賈', effect: () => { game.stats.wealth += 100; game.stats.wisdom += 8; return '撥動算子靈巧無比，掌櫃之材！銅錢+100，智略+8'; } },
+            { name: '羊脂玉珮', desc: '謙謙君子，溫潤若玉', effect: () => { game.stats.fame += 20; return '佩玉鏘鏘，名士風骨已然具備！名望+20'; } },
+            { name: '銅鑄官印', desc: '志在青雲，社稷棟樑', effect: () => { game.stats.fame += 10; game.stats.merit += 10; return '一手緊握赤銅官印不放，親朋咸稱其將相之器！名望+10，起手軍功+10'; } },
+            { name: '彩塑泥人', desc: '安貧樂道，仁心厚道', effect: () => { game.stats.hp += 15; return '體健少疾，敦厚質樸！體魄+15'; } }
+        ];
+
+        function triggerZhuazhou() {
+            stopAuto();
+            game.isModalActive = true;
+            el.zhuazhouItems.innerHTML = '';
+
+            ZHUAZHOU_ITEMS.forEach(item => {
+                const btn = document.createElement('button');
+                btn.className = "p-3 rounded bg-white hover:bg-amber-100/60 border border-stone-300 text-left transition flex flex-col justify-between shadow-xs";
+                btn.innerHTML = `
+                    <div class="font-bold text-ink-950 text-sm mb-1 text-vermilion-700">${item.name}</div>
+                    <div class="text-[11px] text-stone-600">${item.desc}</div>
+                `;
+                btn.onclick = () => {
+                    audio.pluck(2);
+                    const logMsg = item.effect();
+                    el.zhuazhouModal.classList.add('hidden');
+                    game.isModalActive = false;
+                    appendLog(game.year, 1, "周晬", `周歲抓周：伸小手取【${item.name}】。${logMsg}`, 'choice');
+                    updateUI();
+                };
+                el.zhuazhouItems.appendChild(btn);
+            });
+
+            el.zhuazhouModal.classList.remove('hidden');
+        }
+
+        /* ================= 6. 界面屬性更新 ================= */
+        function updateUI() {
+            el.heroName.innerText = game.name;
+            el.heroGender.innerText = game.gender;
+            el.heroBirthRank.innerText = game.socialClass.name;
+            el.eraYear.innerText = `${getEraTitle(game.year)} (${game.year}年)`;
+            el.heroAge.innerText = `${game.age} 歲 · ${getAgePhase(game.age)}`;
+            el.heroFaction.innerText = game.faction;
+            el.actionPoints.innerText = `令符: ${game.actionPoints}/2`;
+
+            // 官銜與爵祿
+            const curOffice = getCurrentOffice();
+            el.heroOffice.innerText = `${curOffice.title} (${game.careerTrack === 'civil' ? '文職' : '武職'})`;
+            
+            const curNobility = NOBILITY_RANKS[Math.min(game.nobilityLevel, NOBILITY_RANKS.length - 1)];
+            el.heroNobility.innerText = `${curNobility.title} · 歲俸米 ${curOffice.salaryGrain || 0} 石`;
+
+            // 姻親
+            el.heroSpouse.innerText = game.spouse ? game.spouse : '孤家單身';
+            el.heroChildren.innerText = `${game.childrenCount} 人`;
+
+            // 六維數值
+            el.valHp.innerText = game.stats.hp;
+            el.valMight.innerText = game.stats.might;
+            el.valWisdom.innerText = game.stats.wisdom;
+            el.valFame.innerText = game.stats.fame;
+            el.valMerit.innerText = game.stats.merit;
+            el.valWealth.innerText = `${Math.max(0, game.stats.wealth)} 錢`;
+            el.valGrain.innerText = `儲糧：${Math.max(0, game.stats.grain)} 石`;
+
+            // 進度條
+            el.barHp.style.width = `${Math.min(100, Math.max(0, game.stats.hp))}%`;
+            el.barMight.style.width = `${Math.min(100, (game.stats.might / 130) * 100)}%`;
+            el.barWisdom.style.width = `${Math.min(100, (game.stats.wisdom / 130) * 100)}%`;
+            el.barFame.style.width = `${Math.min(100, (game.stats.fame / 250) * 100)}%`;
+            el.barMerit.style.width = `${Math.min(100, (game.stats.merit / 300) * 100)}%`;
+
+            // 先天命格顯示
+            if (game.destiny) {
+                el.destinyBadges.innerHTML = `
+                    <span class="seal-stamp text-[11px] px-1.5 py-0.2 rounded">${game.destiny.name}</span>
+                `;
+            }
+
+            // 寶物神兵顯示
+            if (game.treasures.length > 0) {
+                el.equipmentBadges.innerHTML = game.treasures.map(t => 
+                    `<span class="bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.5 rounded text-[10px] font-bold">${t.name}</span>`
+                ).join(' ');
+            } else {
+                el.equipmentBadges.innerText = '布衣無刃';
+            }
+
+            // 羈絆名將
+            if (game.friends.length > 0) {
+                el.friendsList.innerHTML = game.friends.map(f => 
+                    `<span class="bg-white px-2 py-0.5 border border-stone-300 rounded shadow-2xs font-semibold text-ink-950">${f.name} (${f.role})</span>`
+                ).join(' ');
+            } else {
+                el.friendsList.innerHTML = `<span class="text-stone-500 italic">尚無生死知交</span>`;
+            }
+        }
+
+        function getCurrentOffice() {
+            if (game.careerTrack === 'civil') {
+                return OFFICES_CIVIL[Math.min(game.officeLevel, OFFICES_CIVIL.length - 1)];
+            } else {
+                return OFFICES_MILITARY[Math.min(game.officeLevel, OFFICES_MILITARY.length - 1)];
+            }
+        }
+
+        function getEraTitle(yr) {
+            if (yr <= 189) return "中平年間";
+            if (yr <= 193) return "初平年間";
+            if (yr <= 195) return "興平年間";
+            if (yr <= 219) return "建安年間";
+            if (yr <= 226) return "黃初/章武年間";
+            if (yr <= 237) return "太和/建興年間";
+            if (yr <= 253) return "延熙/嘉平年間";
+            if (yr <= 265) return "景元/咸熙年間";
+            return "西晉泰始年間";
+        }
+
+        function getAgePhase(age) {
+            if (age < 6) return "襁褓幼童";
+            if (age < 15) return "總角童髫";
+            if (age < 20) return "束髮及冠";
+            if (age < 35) return "弱冠而立";
+            if (age < 50) return "不惑之年";
+            if (age < 65) return "知天命之歲";
+            return "古稀耆宿";
+        }
+
+        /* ================= 7. 日誌渲染 ================= */
+        function appendLog(year, age, tag, text, style = 'normal') {
+            const div = document.createElement('div');
+            div.className = "ink-appear p-3 rounded text-xs sm:text-sm leading-relaxed border transition-all duration-300 ";
+
+            let tagStyle = "border-stone-300 text-stone-800 bg-white/70";
+            if (style === 'history') {
+                tagStyle = "border-amber-400 bg-amber-50/90 text-amber-950 font-medium";
+            } else if (style === 'battle') {
+                tagStyle = "border-red-400 bg-red-50/90 text-red-950 font-semibold";
+            } else if (style === 'choice') {
+                tagStyle = "border-blue-300 bg-blue-50/80 text-blue-950";
+            } else if (style === 'danger') {
+                tagStyle = "border-red-500 bg-red-100/90 text-red-900";
+            }
+
+            div.className += tagStyle;
+            div.innerHTML = `
+                <div class="flex items-center justify-between mb-1 text-[11px] text-stone-500 border-b border-stone-200 pb-0.5">
+                    <span class="flex items-center space-x-1.5">
+                        <span class="seal-stamp text-[9px] px-1 rounded">${tag}</span>
+                        <span class="font-bold text-stone-700">${year}年 · ${age}歲</span>
+                    </span>
+                    <span>${getEraTitle(year)}</span>
+                </div>
+                <div>${text}</div>
+            `;
+
+            el.storyScroll.appendChild(div);
+            el.storyScroll.scrollTop = el.storyScroll.scrollHeight;
+
+            game.historyLogs.push({ year, age, tag, text });
+        }
+
+        /* ================= 8. 主動年度政務與活動 (令符行動) ================= */
+        function performAction(type) {
+            if (!game.alive || game.isModalActive) return;
+            if (game.actionPoints <= 0) {
+                appendLog(game.year, game.age, "告誡", "本年度兩枚令符已耗盡，請點擊「度過一年」邁向次年！");
+                return;
+            }
+
+            game.actionPoints--;
+
+            switch(type) {
+                case 'train': {
+                    audio.pluck(3);
+                    const gainMight = Math.floor(Math.random() * 6) + 5;
+                    const gainHp = Math.floor(Math.random() * 4) + 2;
+                    game.stats.might += gainMight;
+                    game.stats.hp = Math.min(100, game.stats.hp + gainHp);
+                    appendLog(game.year, game.age, "演武", `於校場頂風冒雪揮刀射鵠，筋骨愈發強健！武勇+${gainMight}，體魄+${gainHp}。`);
+                    break;
+                }
+                case 'study': {
+                    audio.pluck(1);
+                    const mult = (game.destiny?.id === 'genius') ? 2 : 1;
+                    const gainWis = (Math.floor(Math.random() * 6) + 5) * mult;
+                    const gainFame = Math.floor(Math.random() * 4) + 2;
+                    game.stats.wisdom += gainWis;
+                    game.stats.fame += gainFame;
+                    appendLog(game.year, game.age, "研讀", `挑燈夜讀《左氏春秋》與兵書殘卷，深明用兵經緯。智略+${gainWis}，德行聲望+${gainFame}。`);
+                    break;
+                }
+                case 'trade': {
+                    audio.pluck(4);
+                    let profit = Math.floor(game.stats.wisdom * 1.5 + Math.random() * 80 + 30);
+                    if (game.destiny?.id === 'croesus') profit = Math.floor(profit * 1.5);
+                    const grainGain = Math.floor(profit / 10);
+                    game.stats.wealth += profit;
+                    game.stats.grain += grainGain;
+                    appendLog(game.year, game.age, "營商", `販運蜀錦與青州海鹽，經紀有道，市井獲利。得銅錢+${profit}，積糧+${grainGain}石。`);
+                    break;
+                }
+                case 'social': {
+                    audio.pluck(5);
+                    socializeFamousFigure();
+                    break;
+                }
+                case 'seekImmortal': {
+                    audio.pluck(2);
+                    seekImmortalEvent();
+                    break;
+                }
+                case 'govern': {
+                    audio.pluck(0);
+                    governTerritory();
+                    break;
+                }
+            }
+
+            updateUI();
+        }
+
+        // 拜會名將互動
+        function socializeFamousFigure() {
+            const figure = HISTORICAL_FIGURES[Math.floor(Math.random() * HISTORICAL_FIGURES.length)];
+            const alreadyFriend = game.friends.some(f => f.name === figure.name);
+
+            if (alreadyFriend) {
+                appendLog(game.year, game.age, "雅敘", `與生死至交【${figure.name}】於松下煮酒論天下大勢，推心置腹，豪氣干雲！智略+5，名望+5。`);
+                game.stats.wisdom += 5;
+                game.stats.fame += 5;
+                return;
+            }
+
+            // 判定是否結交成功
+            let success = false;
+            if (figure.likeTrait === 'might' && game.stats.might >= 45) success = true;
+            if (figure.likeTrait === 'wisdom' && game.stats.wisdom >= 45) success = true;
+            if (figure.likeTrait === 'fame' && game.stats.fame >= 35) success = true;
+            if (figure.likeTrait === 'wealth' && game.stats.wealth >= 200) success = true;
+            if (game.destiny?.id === 'righteous') success = true;
+
+            if (success) {
+                game.friends.push(figure);
+                appendLog(game.year, game.age, "結交", `登門造訪【${figure.name}】（${figure.role}）。言談投機，相見恨晚，結為刎頸莫逆之交！聲望+20。`);
+                game.stats.fame += 20;
+
+                // 名士贈禮 (機率贈神兵)
+                if (Math.random() < 0.4 && !game.treasures.some(t => t.name === figure.gift)) {
+                    const treasureItem = TREASURES_REPO.find(t => t.name === figure.gift) || { name: figure.gift, perk: '相知名品' };
+                    game.treasures.push(treasureItem);
+                    appendLog(game.year, game.age, "贈寶", `【${figure.name}】感念知遇之德，特以【${figure.gift}】相贈！`, 'choice');
+                }
+            } else {
+                appendLog(game.year, game.age, "交際", `攜禮往訪【${figure.name}】，奈何對方門客眾多，僅略作寒暄，未得深交。消耗銅錢20。`);
+                game.stats.wealth = Math.max(0, game.stats.wealth - 20);
+            }
+        }
+
+        // 尋仙訪道 (華佗、左慈、于吉機緣)
+        function seekImmortalEvent() {
+            const roll = Math.random();
+            if (roll < 0.35) {
+                appendLog(game.year, game.age, "機緣", "於深山採藥偶遇神醫華佗，傳授五禽戲吐納法與麻沸散殘方。體魄恢復至滿值，體魄上限+10！", 'history');
+                game.stats.hp = 100;
+            } else if (roll < 0.65) {
+                appendLog(game.year, game.age, "方術", "得見方士左慈於石室擲杯化鶴，得贈仙丹一枚服之，神清氣爽。智略+12，壽算暗增。");
+                game.stats.wisdom += 12;
+            } else {
+                appendLog(game.year, game.age, "雲遊", "跋山涉水尋訪隱逸，雖未遇神仙，但踏遍群山，胸中丘壑大開。武勇+4。");
+                game.stats.might += 4;
+            }
+        }
+
+        // 治民屯田 / 兵功升遷
+        function governTerritory() {
+            if (game.officeLevel === 0) {
+                // 尚未入仕
+                if (game.stats.fame >= 30 || game.stats.merit >= 20 || game.socialClass.id === 'nobility') {
+                    game.officeLevel = 1;
+                    appendLog(game.year, game.age, "入仕", `因鄉里風評高尚且名望冠州，獲郡守徵辟入仕，拜任【${getCurrentOffice().title}】！`, 'choice');
+                } else {
+                    appendLog(game.year, game.age, "積累", "白身之軀欲求入仕，尚需名望達30以上或累計軍功20點。請多讀書習武或結納名流。");
+                }
+                return;
+            }
+
+            // 已入仕，進行政務
+            const meritGain = Math.floor(Math.random() * 8) + 8;
+            game.stats.merit += meritGain;
+            game.stats.grain += 15;
+            appendLog(game.year, game.age, "治政", `修築水利溝渠，勸課農桑，督練民勇。軍功政績+${meritGain}，倉廩實存。`);
+
+            // 檢核官階晉升
+            checkOfficePromotion();
+        }
+
+        function checkOfficePromotion() {
+            const nextLevel = game.officeLevel + 1;
+            const targetList = game.careerTrack === 'civil' ? OFFICES_CIVIL : OFFICES_MILITARY;
+            if (nextLevel < targetList.length) {
+                const target = targetList[nextLevel];
+                let qualified = false;
+                if (game.careerTrack === 'civil') {
+                    if (game.stats.fame >= target.needFame && game.stats.wisdom >= target.needWisdom) qualified = true;
+                } else {
+                    if (game.stats.merit >= target.needMerit && game.stats.might >= target.needMight) qualified = true;
+                }
+
+                if (qualified) {
+                    game.officeLevel = nextLevel;
+                    audio.pluck(6);
+                    appendLog(game.year, game.age, "擢升", `【政績卓著】朝廷有詔，遷官受封為【${target.title}】！歲俸大幅提升！`, 'choice');
+                    
+                    // 機緣封侯
+                    if (game.officeLevel >= 4 && game.nobilityLevel < 2) {
+                        game.nobilityLevel = 2; // 亭侯
+                        appendLog(game.year, game.age, "封爵", "天子感念忠勤，冊封為【亭侯】，賜食邑百戶！名震華夏！", 'history');
+                    }
+                }
+            }
+        }
+
+        /* ================= 9. 年度歲月推演 (度過一年核心) ================= */
+        function stepYear() {
+            if (!game.alive || game.isModalActive) return;
+
+            game.year++;
+            game.age++;
+            game.actionPoints = 2; // 恢復令符
+            audio.pluck(0);
+
+            // 領受官俸米石與五銖錢
+            const curOffice = getCurrentOffice();
+            if (curOffice.salaryGrain > 0) {
+                game.stats.grain += curOffice.salaryGrain;
+                game.stats.wealth += curOffice.salaryMoney;
+            }
+
+            // 扣除家眷歲計口糧 (每丁口每年吃米3石)
+            const household = 1 + (game.spouse ? 1 : 0) + game.childrenCount;
+            const grainNeed = household * 3;
+            if (game.stats.grain >= grainNeed) {
+                game.stats.grain -= grainNeed;
+            } else {
+                game.stats.grain = 0;
+                game.stats.hp -= 10;
+                appendLog(game.year, game.age, "荒歉", "府邸儲糧告罄，全家老幼忍飢挨餓，體魄受損！", 'danger');
+            }
+
+            // 1. 周歲特殊事件：抓周
+            if (game.age === 1) {
+                triggerZhuazhou();
+                updateUI();
+                return;
+            }
+
+            // 2. 重大歷史節點與戰役判定 (優先觸發陣法微戰鬥)
+            if (checkHistoricalBattles()) {
+                updateUI();
+                return;
+            }
+
+            // 3. 關鍵人生抉擇 (16歲定志、20歲擇主盟誓)
+            if (checkLifeMilestones()) {
+                updateUI();
+                return;
+            }
+
+            // 4. 常規年度隨機事件 (天災、婚配、子嗣、疾病)
+            processRandomYearlyEvent();
+
+            // 5. 老年身體衰竭判定
+            if (game.age > 48) {
+                const ageDecay = Math.floor((game.age - 45) * 0.6);
+                game.stats.hp -= ageDecay;
+            }
+
+            // 6. 生死存亡檢驗
+            checkLifeStatus();
+
+            updateUI();
+        }
+
+        /* ================= 10. 三國著名歷史戰役 (陣法微玩法) ================= */
+        const BATTLE_EVENTS = {
+            190: { name: "虎牢關大戰", desc: "董卓屯重兵於虎牢關，天下十八路諸侯盟誓討逆。西涼驍將呂布搦戰關前，諸侯震恐！" },
+            200: { name: "官渡決死之役", desc: "袁紹十萬精銳南下，曹軍相持於官渡，兵疲糧盡。烏巢之火即將燃起！" },
+            208: { name: "赤壁烈火燎原", desc: "曹公號稱八十萬大軍順流而下，戰艦首尾相連。周瑜、諸葛孔明聯軍欲借東風一炬破曹！" },
+            219: { name: "襄樊水淹七軍", desc: "關雲長威震華夏，漢水暴漲。東吳呂蒙白衣渡江奇襲烽火台，荊襄危若累卵！" },
+            222: { name: "夷陵烈焰連營", desc: "先主劉備起傾國之兵伐吳，連營七百里。陸遜深溝高壘，火攻大計蓄勢待發！" }
+        };
+
+        function checkHistoricalBattles() {
+            const battle = BATTLE_EVENTS[game.year];
+            if (battle && game.age >= 16 && game.officeLevel >= 1) {
+                triggerBattleChoice(battle);
+                return true;
+            }
+            return false;
+        }
+
+        function triggerBattleChoice(battle) {
+            stopAuto();
+            game.isModalActive = true;
+            audio.warDrum();
+
+            el.choiceStamp.innerText = "兵戈戰役";
+            el.choiceTitle.innerText = `${battle.name} · 軍前布陣`;
+            el.choiceDesc.innerText = `${battle.desc} 大軍即將交鋒，汝身為三軍將弁，欲設何等陣法迎敵？`;
+            el.choiceOptions.innerHTML = '';
+
+            TACTICS.forEach(tactic => {
+                const btn = document.createElement('button');
+                btn.className = "p-3 rounded bg-white hover:bg-red-50/70 border border-stone-300 hover:border-red-600 shadow-sm text-left transition flex flex-col justify-between";
+                btn.innerHTML = `
+                    <div class="font-bold text-ink-950 text-sm flex items-center justify-between">
+                        <span class="text-vermilion-700 font-bold">${tactic.name}</span>
+                        <span class="text-[10px] bg-stone-200 px-1.5 py-0.5 rounded text-stone-700">倚仗: ${tactic.req === 'might' ? '武勇' : tactic.req === 'wisdom' ? '智略' : '體魄'}</span>
+                    </div>
+                    <div class="text-[11px] text-stone-600 mt-1">${tactic.bonus}。風險：${tactic.risk}。</div>
+                `;
+                btn.onclick = () => {
+                    resolveBattle(battle, tactic);
+                };
+                el.choiceOptions.appendChild(btn);
+            });
+
+            el.choiceContainer.classList.remove('hidden');
+        }
+
+        function resolveBattle(battle, tactic) {
+            el.choiceContainer.classList.add('hidden');
+            game.isModalActive = false;
+
+            // 計算勝負戰果
+            let statVal = tactic.req === 'might' ? game.stats.might : (tactic.req === 'wisdom' ? game.stats.wisdom : game.stats.hp);
+            // 寶物加成
+            if (game.treasures.some(t => t.name === '《孟德新書》')) statVal += 20;
+
+            const roll = Math.random() * 50 + statVal;
+
+            if (roll >= 85) {
+                // 史詩大捷
+                audio.pluck(6);
+                const meritGain = 45;
+                const fameGain = 30;
+                game.stats.merit += meritGain;
+                game.stats.fame += fameGain;
+                game.stats.wealth += 180;
+                appendLog(game.year, game.age, "大捷", `【${battle.name}】布設【${tactic.name}】，料敵機先！親斬敵方先鋒首級，三軍歡騰！斬獲軍功+${meritGain}，名望+${fameGain}，獲賜重賞！`, 'battle');
+            } else if (roll >= 50) {
+                // 平手慘勝
+                audio.pluck(3);
+                const meritGain = 20;
+                game.stats.merit += meritGain;
+                game.stats.hp -= 20;
+                appendLog(game.year, game.age, "鏖戰", `【${battle.name}】施展【${tactic.name}】與敵死鬥。陣斬校尉數人，己身亦中流矢負傷。軍功+${meritGain}，體魄-20。`, 'normal');
+            } else {
+                // 戰敗潰退 (檢驗赤兔馬等免死裝備)
+                audio.warDrum();
+                const hasEscapeMount = game.treasures.some(t => t.name === '赤兔馬');
+                if (hasEscapeMount) {
+                    game.stats.hp -= 15;
+                    appendLog(game.year, game.age, "退陣", `【${battle.name}】陣線瓦解！幸得坐下【赤兔馬】風馳電掣脫離重圍，免於殞命！體魄受損-15。`, 'danger');
+                } else {
+                    game.stats.hp -= 40;
+                    game.stats.merit = Math.max(0, game.stats.merit - 15);
+                    appendLog(game.year, game.age, "兵敗", `【${battle.name}】中敵埋伏，陣形崩潰！浴血棄營狂奔數十里始脫險，傷亡慘重！體魄重創-40，軍功折損！`, 'danger');
+                }
+            }
+
+            checkOfficePromotion();
+            checkLifeStatus();
+            updateUI();
+        }
+
+        /* ================= 11. 關鍵命運節點抉擇 ================= */
+        function checkLifeMilestones() {
+            // 16 歲：行束髮之禮，自擇文武職途
+            if (game.age === 16 && game.officeLevel === 0) {
+                presentMilestoneChoice({
+                    title: "束髮及笄 · 文武立身",
+                    desc: "年已十六，已非童稚之軀。漢末風雲翻湧，當以何等業途以定平生？",
+                    options: [
+                        { text: "投效行伍，以戈矛博取萬里封侯 (武官線)", action: () => { game.careerTrack = 'military'; game.stats.might += 15; appendLog(game.year, 16, "立志", "誓願以七尺之軀提三尺劍，立不世之武功！武勇+15。"); } },
+                        { text: "研讀五經，求取舉孝廉茂才 (文官線)", action: () => { game.careerTrack = 'civil'; game.stats.wisdom += 15; appendLog(game.year, 16, "立志", "立志經邦濟世，以王佐之才佐明主定九州！智略+15。"); } }
+                    ]
+                });
+                return true;
+            }
+
+            // 20 歲：弱冠擇主
+            if (game.age === 20 && game.faction === '在野白身') {
+                presentMilestoneChoice({
+                    title: "弱冠之歲 · 九州擇主",
+                    desc: "天下三分已露端倪，各路雄主廣開賢門。汝欲提劍奔赴哪方諸侯旗下？",
+                    options: [
+                        { text: "投奔許昌曹孟德（功業唯才）", action: () => { game.faction = '曹魏陣營'; game.stats.fame += 20; appendLog(game.year, 20, "從仕", "投身曹公幕下，受器重於軍前！名望+20。", 'choice'); } },
+                        { text: "投奔新野劉玄德（仁義漢室）", action: () => { game.faction = '蜀漢陣營'; game.stats.fame += 25; game.stats.hp -= 5; appendLog(game.year, 20, "從仕", "慕劉皇叔仁德，雖顛沛流離在所不惜！名望+25。", 'choice'); } },
+                        { text: "渡江投奔江東孫仲謀（保境自安）", action: () => { game.faction = '東吳陣營'; game.stats.wealth += 120; appendLog(game.year, 20, "從仕", "江東地靈人傑，拜受江表士族舉薦！家資+120。", 'choice'); } },
+                        { text: "隱逸山林，笑看英雄割據", action: () => { game.faction = '終南隱士'; game.stats.hp += 15; appendLog(game.year, 20, "隱逸", "不願涉足權謀爭鬥，採菊東籬，怡然自得。體魄+15。", 'choice'); } }
+                    ]
+                });
+                return true;
+            }
+
+            return false;
+        }
+
+        function presentMilestoneChoice(data) {
+            stopAuto();
+            game.isModalActive = true;
+            el.choiceStamp.innerText = "命運契機";
+            el.choiceTitle.innerText = data.title;
+            el.choiceDesc.innerText = data.desc;
+            el.choiceOptions.innerHTML = '';
+
+            data.options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = "p-3 rounded bg-white hover:bg-stone-100 border border-stone-300 text-left font-bold text-ink-950 text-xs sm:text-sm shadow-xs transition";
+                btn.innerText = opt.text;
+                btn.onclick = () => {
+                    audio.pluck(1);
+                    el.choiceContainer.classList.add('hidden');
+                    game.isModalActive = false;
+                    opt.action();
+                    updateUI();
+                };
+                el.choiceOptions.appendChild(btn);
+            });
+
+            el.choiceContainer.classList.remove('hidden');
+        }
+
+        /* ================= 12. 常規年度隨機事件庫 ================= */
+        const NORMAL_EVENTS = [
+            { text: "中原大旱，赤地千里，所幸府上庫藏充裕，未致斷炊。", effect: () => { game.stats.grain = Math.max(0, game.stats.grain - 10); } },
+            { text: "於洛陽舊市淘得古兵器殘件，重金請名匠重新淬火。", effect: () => { game.stats.might += 6; game.stats.wealth -= 30; } },
+            { text: "染發熱痢疾，纏綿病榻數旬，幸得名醫以參茸草藥施治。", effect: () => { game.stats.hp -= 12; } },
+            { text: "鄉里宗族發生械鬥，汝親自出面秉公裁決，遠近服膺其德。", effect: () => { game.stats.fame += 10; } },
+            { text: "在山谷中射得一頭斑斕猛虎，虎皮獻於太守，獲賜錦緞千匹。", effect: () => { game.stats.might += 5; game.stats.wealth += 70; } },
+            { text: "偶得蔡文姬《胡笳十八拍》琴譜，月下撫弄，心境淡泊超脫。", effect: () => { game.stats.wisdom += 7; } }
+        ];
+
+        function processRandomYearlyEvent() {
+            // 婚配生子檢定 (20 - 40 歲)
+            if (game.age >= 21 && !game.spouse && game.stats.wealth >= 50) {
+                if (Math.random() < 0.28) {
+                    const SPOUSE_NAMES = ["蔡琰之族女", "樊氏", "喬氏遠親", "麋氏宗女", "鄒氏", "黃月英族妹", "世家才女甄氏"];
+                    game.spouse = SPOUSE_NAMES[Math.floor(Math.random() * SPOUSE_NAMES.length)];
+                    game.stats.wealth -= 40;
+                    appendLog(game.year, game.age, "定盟", `得良緣締結，迎娶【${game.spouse}】為妻室，鼓樂喧天，親鄰交口稱賀！耗聘金40錢。`, 'choice');
+                    return;
+                }
+            }
+
+            if (game.spouse && game.age <= 42 && game.childrenCount < 5) {
+                if (Math.random() < 0.25) {
+                    game.childrenCount++;
+                    appendLog(game.year, game.age, "麟兒", `室中傳出嬰啼之聲，夫人誕下幼嗣！膝下承歡已有 ${game.childrenCount} 名子嗣！門庭增色！`);
+                    return;
+                }
+            }
+
+            // 隨機抽取常規事件
+            if (Math.random() < 0.7) {
+                const ev = NORMAL_EVENTS[Math.floor(Math.random() * NORMAL_EVENTS.length)];
+                ev.effect();
+                appendLog(game.year, game.age, "履歷", ev.text);
+            }
+        }
+
+        /* ================= 13. 青史立傳與結算評定 ================= */
+        function checkLifeStatus() {
+            let isDead = false;
+            let cause = "";
+
+            if (game.stats.hp <= 0) {
+                isDead = true;
+                cause = game.age > 45 ? "體魄漸竭，積勞成疾逝於榻上" : "臨陣創深痛劇，藥石無效殞命";
+            } else if (game.age >= 68) {
+                const deathProb = (game.age - 60) * 0.08;
+                if (Math.random() < deathProb) {
+                    isDead = true;
+                    cause = "古稀高壽，無疾而終，壽終正寢於壽堂";
+                }
+            } else if (game.year >= 265) {
+                isDead = true;
+                cause = "壽登耄耋，眼見三國紛爭終歸西晉一統，含笑謝世";
+            }
+
+            if (isDead) {
+                triggerGameOver(cause);
+            }
+        }
+
+        function triggerGameOver(cause) {
+            game.alive = false;
+            stopAuto();
+            audio.warDrum();
+
+            appendLog(game.year, game.age, "殞命", `【訃告】${game.name} 於 ${game.year} 年溘然仙逝。因：${cause}。享年 ${game.age} 歲。`, 'danger');
+
+            // 結算三國志列傳評定
+            const result = generateBiography(cause);
+
+            el.endHeroTitle.innerText = `諡號 · 【${result.posthumous}】`;
+            el.endHeroCouplet.innerText = `「${result.couplet}」`;
+            el.endBiography.innerHTML = result.biographyHtml;
+
+            el.endStatAge.innerText = `${game.age} 歲`;
+            el.endStatOffice.innerText = getCurrentOffice().title;
+            el.endStatNobility.innerText = NOBILITY_RANKS[Math.min(game.nobilityLevel, NOBILITY_RANKS.length - 1)].title;
+            el.endStatMerit.innerText = game.stats.merit;
+            el.endStatHeir.innerText = `${game.childrenCount} 人`;
+            el.endStatWealth.innerText = `${Math.max(0, game.stats.wealth)} 錢`;
+            el.endStatCause.innerText = cause;
+            el.endStatRank.innerText = result.rank;
+
+            setTimeout(() => {
+                el.deathModal.classList.remove('hidden');
+            }, 600);
+        }
+
+        function generateBiography(cause) {
+            let posthumous = "昭武鄉侯";
+            let couplet = "是非成敗轉頭空，浪花淘盡古今英。";
+            let rank = "中上之才";
+
+            const { might, wisdom, fame, merit } = game.stats;
+
+            // 諡號法則
+            if (merit >= 150 || fame >= 150) {
+                if (game.careerTrack === 'military') {
+                    posthumous = "忠烈名將 / 武侯";
+                    couplet = "提兵百萬指山河，青史長留勇烈名！";
+                    rank = "三國上將 · 國之柱石";
+                } else {
+                    posthumous = "文成文憲公 / 王佐";
+                    couplet = "羽扇輕搖天地變，名垂萬古照千秋！";
+                    rank = "一代國士 · 名宰名相";
+                }
+            } else if (fame >= 60 || merit >= 60) {
+                posthumous = "明敏鄉侯";
+                couplet = "保境安民成勳業，亂世猶存赤子心。";
+                rank = "州郡英傑";
+            } else {
+                if (game.age <= 20) {
+                    posthumous = "殤悼秀士";
+                    couplet = "未展青雲折羽翼，弱冠英才痛早夭。";
+                    rank = "夭折草芥";
+                } else {
+                    posthumous = "處士安平";
+                    couplet = "草莽一生如風萍，何必富貴問公侯。";
+                    rank = "平淡布衣";
+                }
+            }
+
+            const bioHtml = `
+                <p><strong>《三國志 · 卷八十七 · ${game.name}列傳》：</strong></p>
+                <p>${game.name}，生於中平元年，【${game.socialClass.name}】之胤也。初生之時，具【${game.destiny.name}】之奇相。弱冠束髮，決志以【${game.careerTrack === 'civil' ? '文治筆墨' : '橫槊鋒鏑'}】立身。</p>
+                <p>時逢漢室微末，天下鼎沸。${game.name} 歷仕【${game.faction}】，起自草莽，累遷至【${getCurrentOffice().title}】，位列【${NOBILITY_RANKS[Math.min(game.nobilityLevel, NOBILITY_RANKS.length - 1)].title}】。生平治武勇至 ${might}，研智略至 ${wisdom}，立功業積軍功 ${merit} 級，天下莫不欽其風規。</p>
+                <p>歲次 ${game.year}，以享年 ${game.age} 歲卒於邸舍。${game.childrenCount > 0 ? `其遺下嗣子 ${game.childrenCount} 人，傳承宗脈家學。` : '身歿無嗣，同僚皆為之流涕惜之。'}</p>
+                <p class="text-stone-500 italic mt-2">史官陳壽評曰：昔者九州板蕩，豪傑並臻。${game.name} 以草芥或士家奮袂而起，處亂不驚，其行其節，足令後世擊節嘆息！</p>
+            `;
+
+            return { posthumous, couplet, rank, biographyHtml: bioHtml };
+        }
+
+        /* ================= 14. 自動推演與按鈕事件 ================= */
+        function toggleAuto() {
+            if (game.autoTimer) {
+                stopAuto();
+            } else {
+                startAuto();
+            }
+        }
+
+        function startAuto() {
+            if (!game.alive || game.isModalActive) return;
+            game.autoTimer = setInterval(stepYear, game.autoSpeed);
+            el.btnAuto.classList.remove('bg-stone-300');
+            el.btnAuto.classList.add('bg-vermilion-700', 'text-white');
+            el.autoText.innerText = "暫停推演";
+        }
+
+        function stopAuto() {
+            if (game.autoTimer) {
+                clearInterval(game.autoTimer);
+                game.autoTimer = null;
+            }
+            el.btnAuto.classList.remove('bg-vermilion-700', 'text-white');
+            el.btnAuto.classList.add('bg-stone-300', 'text-ink-900');
+            el.autoText.innerText = "自動推演";
+        }
+
+        // 綁定各類事件監聽
+        el.btnNextYear.addEventListener('click', () => {
+            stepYear();
+        });
+
+        el.btnAuto.addEventListener('click', () => {
+            toggleAuto();
+        });
+
+        // 推演速度按鈕
+        document.querySelectorAll('.speed-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.speed-btn').forEach(b => {
+                    b.classList.remove('bg-white', 'shadow-xs', 'text-ink-950');
+                    b.classList.add('text-stone-600');
+                });
+                btn.classList.add('bg-white', 'shadow-xs', 'text-ink-950');
+                game.autoSpeed = parseInt(btn.dataset.speed);
+                if (game.autoTimer) {
+                    stopAuto();
+                    startAuto();
+                }
+            });
+        });
+
+        // 聲音開關
+        el.btnSound.addEventListener('click', () => {
+            audio.enabled = !audio.enabled;
+            el.soundIndicator.innerText = audio.enabled ? "古琴律：鳴" : "古琴律：歇";
+            if (audio.enabled) audio.pluck(0);
+        });
+
+        // 轉世按鈕
+        el.btnRestart.addEventListener('click', () => {
+            startNewLife();
+        });
+        el.btnReincarnate.addEventListener('click', () => {
+            startNewLife();
+        });
+
+        // 複製三國志列傳 (兼顧相容性)
+        el.btnCopyHistory.addEventListener('click', () => {
+            const bioText = el.endBiography.innerText;
+            const fullText = `【亂世浮生錄 · 三國人生模擬器】\n${el.endHeroTitle.innerText}\n${el.endHeroCouplet.innerText}\n享年：${game.age} 歲 | 官至：${getCurrentOffice().title}\n\n${bioText}`;
+            
+            const textarea = document.createElement('textarea');
+            textarea.value = fullText;
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                alert("已成功將《三國志列傳》複製至剪貼簿！可分享與同好品評！");
+            } catch(e) {}
+            document.body.removeChild(textarea);
+        });
+
+        // 空白鍵快進度過一年
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && !game.isModalActive && game.alive) {
+                e.preventDefault();
+                stepYear();
+            }
+        });
+
+        // 頁面載入啟動
+        window.onload = () => {
+            startNewLife();
+        };
+    </script>
+</body>
+</html>
